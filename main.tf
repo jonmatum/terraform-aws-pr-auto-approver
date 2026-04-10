@@ -75,10 +75,10 @@ resource "aws_lambda_function" "this" {
   environment {
     variables = merge(
       {
-        APP_ID          = var.github_app_id
-        PRIVATE_KEY     = var.github_app_private_key
-        WEBHOOK_SECRET  = var.github_webhook_secret
-        ALLOWED_AUTHORS = var.allowed_authors
+        APP_ID                    = var.github_app_id
+        PRIVATE_KEY_SECRET_ARN    = aws_secretsmanager_secret.private_key.arn
+        WEBHOOK_SECRET_SECRET_ARN = aws_secretsmanager_secret.webhook_secret.arn
+        ALLOWED_AUTHORS           = var.allowed_authors
       },
       var.bedrock_enabled ? {
         BEDROCK_ENABLED  = "true"

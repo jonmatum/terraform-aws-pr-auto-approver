@@ -66,7 +66,7 @@ When `monitoring_enabled = true`, the module creates:
 ## Prerequisites
 1. Create a GitHub App with Pull requests (Read & Write) and Checks (Read) permissions, subscribed to Pull request and Check suite events
 2. Build Lambda zip: `npm ci && zip -r lambda.zip index.js lambda.js review.js secrets.js node_modules package.json`
-3. Secrets are passed as Lambda environment variables. Secrets Manager is used for storage and audit purposes.
+3. Lambda reads secrets from Secrets Manager at runtime via ARN — raw values are never stored in Lambda environment variables
 4. (Optional) Enable the Bedrock model in your AWS account via the Bedrock console
 
 ## Inputs

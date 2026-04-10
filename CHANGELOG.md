@@ -1,5 +1,12 @@
 # Changelog
 
+## [1.2.0] - 2026-04-10
+
+### Changed
+- Restored Secrets Manager integration for production-grade secret handling
+- Lambda reads PRIVATE_KEY and WEBHOOK_SECRET from Secrets Manager at runtime via ARN
+- Secrets are never stored in Lambda environment variables
+
 ## [1.1.0] - 2026-04-10
 
 ### Changed
