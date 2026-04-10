@@ -72,7 +72,7 @@ resource "aws_lambda_function" "this" {
   filename                       = var.lambda_zip_path
   source_code_hash               = filebase64sha256(var.lambda_zip_path)
   role                           = aws_iam_role.lambda.arn
-  reserved_concurrent_executions = 10
+  reserved_concurrent_executions = -1
 
   environment {
     variables = merge(
