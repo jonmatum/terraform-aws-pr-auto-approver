@@ -64,23 +64,21 @@ resource "aws_iam_role_policy" "lambda" {
 }
 
 resource "aws_lambda_function" "this" {
-  function_name                  = var.name
-  handler                        = "lambda.handler"
-  runtime                        = "nodejs20.x"
-  timeout                        = var.bedrock_enabled ? 120 : 30
-  memory_size                    = var.bedrock_enabled ? 256 : 128
-  filename                       = var.lambda_zip_path
-  source_code_hash               = filebase64sha256(var.lambda_zip_path)
-  role                           = aws_iam_role.lambda.arn
-  reserved_concurrent_executions = -1
-
+  function_name    = var.name
+  handler          = "lambda.handler"
+  runtime          = "nodejs20.x"
+  timeout          = var.bedrock_enabled ? 120 : 30
+  memory_size      = var.bedrock_enabled ? 256 : 128
+  filename         = var.lambda_zip_path
+  source_code_hash = filebase64sha256(var.lambda_zip_path)
+  role             = aws_iam_role.lambda.arn
   environment {
     variables = merge(
       {
-        APP_ID                 = var.github_app_id
-        PRIVATE_KEY_SECRET_ARN = aws_secretsmanager_secret.private_key.arn
-        WEBHOOK_SECRET_ARN     = aws_secretsmanager_secret.webhook_secret.arn
-        ALLOWED_AUTHORS        = var.allowed_authors
+        APP_ID          = var.github_app_id
+        PRIVATE_KEY     = var.github_app_private_key
+        WEBHOOK_SECRET  = var.github_webhook_secret
+        ALLOWED_AUTHORS = var.allowed_authors
       },
       var.bedrock_enabled ? {
         BEDROCK_ENABLED  = "true"

@@ -1,5 +1,14 @@
 # Changelog
 
+## [1.1.0] - 2026-04-10
+
+### Changed
+- Lambda env vars now pass secrets directly instead of Secrets Manager ARNs (Probot requires WEBHOOK_SECRET and PRIVATE_KEY at startup before user code runs)
+- Removed reserved_concurrent_executions to avoid conflicts with low-limit AWS accounts
+
+### Added
+- Optional CloudWatch monitoring (dashboard, alarms, SNS alerts, Bedrock budget)
+
 ## [1.0.0] - 2026-04-10
 
 ### Added
