@@ -103,18 +103,18 @@ resource "aws_budgets_budget" "bedrock" {
   }
 
   notification {
-    comparison_operator       = "GREATER_THAN"
-    threshold                 = 80
-    threshold_type            = "PERCENTAGE"
-    notification_type         = "ACTUAL"
+    comparison_operator        = "GREATER_THAN"
+    threshold                  = 80
+    threshold_type             = "PERCENTAGE"
+    notification_type          = "ACTUAL"
     subscriber_email_addresses = var.alert_email != "" ? [var.alert_email] : []
   }
 
   notification {
-    comparison_operator       = "GREATER_THAN"
-    threshold                 = 100
-    threshold_type            = "PERCENTAGE"
-    notification_type         = "ACTUAL"
+    comparison_operator        = "GREATER_THAN"
+    threshold                  = 100
+    threshold_type             = "PERCENTAGE"
+    notification_type          = "ACTUAL"
     subscriber_email_addresses = var.alert_email != "" ? [var.alert_email] : []
   }
 }
@@ -134,7 +134,7 @@ resource "aws_cloudwatch_dashboard" "this" {
         width  = 12
         height = 6
         properties = {
-          title   = "Lambda Invocations & Errors"
+          title = "Lambda Invocations & Errors"
           metrics = [
             ["AWS/Lambda", "Invocations", "FunctionName", aws_lambda_function.this.function_name],
             [".", "Errors", ".", "."],
@@ -152,7 +152,7 @@ resource "aws_cloudwatch_dashboard" "this" {
         width  = 12
         height = 6
         properties = {
-          title   = "Lambda Duration"
+          title = "Lambda Duration"
           metrics = [
             ["AWS/Lambda", "Duration", "FunctionName", aws_lambda_function.this.function_name, { stat = "Average" }],
             ["...", { stat = "p99" }],
@@ -168,7 +168,7 @@ resource "aws_cloudwatch_dashboard" "this" {
         width  = 12
         height = 6
         properties = {
-          title   = "API Gateway Requests"
+          title = "API Gateway Requests"
           metrics = [
             ["AWS/ApiGateway", "Count", "ApiId", aws_apigatewayv2_api.this.id],
             [".", "5xx", ".", "."],
@@ -186,7 +186,7 @@ resource "aws_cloudwatch_dashboard" "this" {
         width  = 12
         height = 6
         properties = {
-          title   = "Lambda Concurrent Executions"
+          title = "Lambda Concurrent Executions"
           metrics = [
             ["AWS/Lambda", "ConcurrentExecutions", "FunctionName", aws_lambda_function.this.function_name],
           ]
@@ -195,25 +195,25 @@ resource "aws_cloudwatch_dashboard" "this" {
           region = data.aws_region.current.name
         }
       },
-    ],
-    var.bedrock_enabled ? [
-      {
-        type   = "metric"
-        x      = 0
-        y      = 12
-        width  = 24
-        height = 6
-        properties = {
-          title   = "Bedrock Invocations"
-          metrics = [
-            ["AWS/Bedrock", "Invocations", "ModelId", var.bedrock_model_id],
-            [".", "InvocationLatency", ".", ".", { stat = "Average" }],
-          ]
-          period = 300
-          stat   = "Sum"
-          region = data.aws_region.current.name
-        }
-      },
+      ],
+      var.bedrock_enabled ? [
+        {
+          type   = "metric"
+          x      = 0
+          y      = 12
+          width  = 24
+          height = 6
+          properties = {
+            title = "Bedrock Invocations"
+            metrics = [
+              ["AWS/Bedrock", "Invocations", "ModelId", var.bedrock_model_id],
+              [".", "InvocationLatency", ".", ".", { stat = "Average" }],
+            ]
+            period = 300
+            stat   = "Sum"
+            region = data.aws_region.current.name
+          }
+        },
     ] : [])
   })
 }
