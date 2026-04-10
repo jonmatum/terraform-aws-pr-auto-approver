@@ -40,6 +40,13 @@ data "aws_iam_policy_document" "lambda" {
       aws_secretsmanager_secret.webhook_secret.arn,
     ]
   }
+  dynamic "statement" {
+    for_each = var.bedrock_enabled ? [1] : []
+    content {
+      actions   = ["bedrock:InvokeModel"]
+      resources = ["arn:aws:bedrock:*::foundation-model/${var.bedrock_model_id}"]
+    }
+  }
 }
 resource "aws_iam_role_policy" "lambda" {
   name   = var.name
@@ -50,18 +57,24 @@ resource "aws_lambda_function" "this" {
   function_name    = var.name
   handler          = "lambda.handler"
   runtime          = "nodejs20.x"
-  timeout          = 30
-  memory_size      = 128
+  timeout          = var.bedrock_enabled ? 120 : 30
+  memory_size      = var.bedrock_enabled ? 256 : 128
   filename         = var.lambda_zip_path
   source_code_hash = filebase64sha256(var.lambda_zip_path)
   role             = aws_iam_role.lambda.arn
   environment {
-    variables = {
-      APP_ID          = var.github_app_id
-      PRIVATE_KEY     = aws_secretsmanager_secret.private_key.arn
-      WEBHOOK_SECRET  = aws_secretsmanager_secret.webhook_secret.arn
-      ALLOWED_AUTHORS = var.allowed_authors
-    }
+    variables = merge(
+      {
+        APP_ID          = var.github_app_id
+        PRIVATE_KEY     = aws_secretsmanager_secret.private_key.arn
+        WEBHOOK_SECRET  = aws_secretsmanager_secret.webhook_secret.arn
+        ALLOWED_AUTHORS = var.allowed_authors
+      },
+      var.bedrock_enabled ? {
+        BEDROCK_ENABLED  = "true"
+        BEDROCK_MODEL_ID = var.bedrock_model_id
+      } : {}
+    )
   }
   tags = var.tags
 }

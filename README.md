@@ -1,19 +1,23 @@
 # terraform-aws-pr-auto-approver
 
-Terraform module that deploys a GitHub App PR auto-approver to AWS Lambda behind API Gateway.
+Terraform module that deploys a GitHub App PR auto-approver to AWS Lambda behind API Gateway, with optional AI code review via Amazon Bedrock.
 
 ## Architecture
 
-GitHub PR Event → API Gateway (HTTP) → Lambda (Probot) → GitHub API (approve)
+```
+GitHub PR Event → API Gateway (HTTP) → Lambda (Probot) → [Bedrock Review] → GitHub API
+```
 
 ## Resources Created
 - AWS Lambda
 - API Gateway v2 (HTTP)
 - Secrets Manager (private key + webhook secret)
-- IAM Role (least-privilege)
+- IAM Role (least-privilege, Bedrock permissions added only when enabled)
 - CloudWatch Log Group (14-day retention)
 
 ## Usage
+
+### Basic (auto-approve after CI passes)
 
 ```hcl
 module "approver_infra" {
@@ -26,20 +30,37 @@ module "approver_infra" {
   allowed_authors        = "your-username"
   lambda_zip_path        = "./lambda.zip"
 }
+```
 
-module "approver_github" {
-  source  = "jonmatum/pr-auto-approver/github"
+### With Bedrock AI Review
+
+```hcl
+module "approver_infra" {
+  source  = "jonmatum/pr-auto-approver/aws"
   version = "~> 1.0"
 
-  webhook_url           = module.approver_infra.webhook_url
-  webhook_secret        = var.webhook_secret
-  github_repositories   = ["my-repo"]
+  github_app_id          = "123456"
+  github_app_private_key = file("private-key.pem")
+  github_webhook_secret  = var.webhook_secret
+  allowed_authors        = "your-username"
+  lambda_zip_path        = "./lambda.zip"
+
+  bedrock_enabled  = true
+  bedrock_model_id = "anthropic.claude-3-haiku-20240307-v1:0"
 }
 ```
 
+When Bedrock is enabled:
+- Lambda timeout increases to 120s, memory to 256MB
+- IAM role gets `bedrock:InvokeModel` permission scoped to the specified model
+- The bot reviews the PR diff for bugs, security issues, and missing error handling
+- If issues are found → posts review comments + requests changes
+- If no issues → auto-approves
+
 ## Prerequisites
 1. Create a GitHub App with Pull requests (Read & Write) and Checks (Read) permissions, subscribed to Pull request and Check suite events
-2. Build Lambda zip from pr-auto-approver repo: `npm ci && zip -r lambda.zip index.js lambda.js node_modules package.json`
+2. Build Lambda zip: `npm ci && zip -r lambda.zip index.js lambda.js review.js node_modules package.json`
+3. (Optional) Enable the Bedrock model in your AWS account via the Bedrock console
 
 ## Inputs
 
@@ -51,6 +72,8 @@ module "approver_github" {
 | github_webhook_secret | GitHub App webhook secret | `string` | n/a | yes |
 | allowed_authors | Comma-separated GitHub usernames to auto-approve | `string` | `""` | no |
 | lambda_zip_path | Path to the Lambda deployment zip | `string` | n/a | yes |
+| bedrock_enabled | Enable AI code review via Amazon Bedrock | `bool` | `false` | no |
+| bedrock_model_id | Bedrock model ID for AI review | `string` | `"anthropic.claude-3-haiku-20240307-v1:0"` | no |
 | tags | Tags to apply to all resources | `map(string)` | `{}` | no |
 
 ## Outputs

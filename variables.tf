@@ -26,6 +26,16 @@ variable "lambda_zip_path" {
   type        = string
   description = "Path to the Lambda deployment zip"
 }
+variable "bedrock_enabled" {
+  type        = bool
+  default     = false
+  description = "Enable AI code review via Amazon Bedrock"
+}
+variable "bedrock_model_id" {
+  type        = string
+  default     = "anthropic.claude-3-haiku-20240307-v1:0"
+  description = "Bedrock model ID for AI review"
+}
 variable "tags" {
   type        = map(string)
   default     = {}
