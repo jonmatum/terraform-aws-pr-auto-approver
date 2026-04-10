@@ -2,18 +2,22 @@ resource "aws_secretsmanager_secret" "private_key" {
   name = "${var.name}-private-key"
   tags = var.tags
 }
+
 resource "aws_secretsmanager_secret_version" "private_key" {
   secret_id     = aws_secretsmanager_secret.private_key.id
   secret_string = var.github_app_private_key
 }
+
 resource "aws_secretsmanager_secret" "webhook_secret" {
   name = "${var.name}-webhook-secret"
   tags = var.tags
 }
+
 resource "aws_secretsmanager_secret_version" "webhook_secret" {
   secret_id     = aws_secretsmanager_secret.webhook_secret.id
   secret_string = var.github_webhook_secret
 }
+
 data "aws_iam_policy_document" "lambda_assume" {
   statement {
     actions = ["sts:AssumeRole"]
@@ -23,16 +27,19 @@ data "aws_iam_policy_document" "lambda_assume" {
     }
   }
 }
+
 resource "aws_iam_role" "lambda" {
   name               = var.name
   assume_role_policy = data.aws_iam_policy_document.lambda_assume.json
   tags               = var.tags
 }
+
 data "aws_iam_policy_document" "lambda" {
   statement {
     actions   = ["logs:CreateLogGroup", "logs:CreateLogStream", "logs:PutLogEvents"]
     resources = ["arn:aws:logs:*:*:*"]
   }
+
   statement {
     actions = ["secretsmanager:GetSecretValue"]
     resources = [
@@ -40,6 +47,7 @@ data "aws_iam_policy_document" "lambda" {
       aws_secretsmanager_secret.webhook_secret.arn,
     ]
   }
+
   dynamic "statement" {
     for_each = var.bedrock_enabled ? [1] : []
     content {
@@ -48,27 +56,31 @@ data "aws_iam_policy_document" "lambda" {
     }
   }
 }
+
 resource "aws_iam_role_policy" "lambda" {
   name   = var.name
   role   = aws_iam_role.lambda.id
   policy = data.aws_iam_policy_document.lambda.json
 }
+
 resource "aws_lambda_function" "this" {
-  function_name    = var.name
-  handler          = "lambda.handler"
-  runtime          = "nodejs20.x"
-  timeout          = var.bedrock_enabled ? 120 : 30
-  memory_size      = var.bedrock_enabled ? 256 : 128
-  filename         = var.lambda_zip_path
-  source_code_hash = filebase64sha256(var.lambda_zip_path)
-  role             = aws_iam_role.lambda.arn
+  function_name                  = var.name
+  handler                        = "lambda.handler"
+  runtime                        = "nodejs20.x"
+  timeout                        = var.bedrock_enabled ? 120 : 30
+  memory_size                    = var.bedrock_enabled ? 256 : 128
+  filename                       = var.lambda_zip_path
+  source_code_hash               = filebase64sha256(var.lambda_zip_path)
+  role                           = aws_iam_role.lambda.arn
+  reserved_concurrent_executions = 10
+
   environment {
     variables = merge(
       {
-        APP_ID          = var.github_app_id
-        PRIVATE_KEY     = aws_secretsmanager_secret.private_key.arn
-        WEBHOOK_SECRET  = aws_secretsmanager_secret.webhook_secret.arn
-        ALLOWED_AUTHORS = var.allowed_authors
+        APP_ID                 = var.github_app_id
+        PRIVATE_KEY_SECRET_ARN = aws_secretsmanager_secret.private_key.arn
+        WEBHOOK_SECRET_ARN     = aws_secretsmanager_secret.webhook_secret.arn
+        ALLOWED_AUTHORS        = var.allowed_authors
       },
       var.bedrock_enabled ? {
         BEDROCK_ENABLED  = "true"
@@ -76,35 +88,47 @@ resource "aws_lambda_function" "this" {
       } : {}
     )
   }
+
   tags = var.tags
 }
+
 resource "aws_cloudwatch_log_group" "lambda" {
   name              = "/aws/lambda/${aws_lambda_function.this.function_name}"
   retention_in_days = 14
   tags              = var.tags
 }
+
 resource "aws_apigatewayv2_api" "this" {
   name          = var.name
   protocol_type = "HTTP"
   tags          = var.tags
 }
+
 resource "aws_apigatewayv2_stage" "this" {
   api_id      = aws_apigatewayv2_api.this.id
   name        = "$default"
   auto_deploy = true
   tags        = var.tags
+
+  default_route_settings {
+    throttling_burst_limit = 10
+    throttling_rate_limit  = 5
+  }
 }
+
 resource "aws_apigatewayv2_integration" "this" {
   api_id                 = aws_apigatewayv2_api.this.id
   integration_type       = "AWS_PROXY"
   integration_uri        = aws_lambda_function.this.invoke_arn
   payload_format_version = "2.0"
 }
+
 resource "aws_apigatewayv2_route" "this" {
   api_id    = aws_apigatewayv2_api.this.id
   route_key = "POST /api/github/webhooks"
   target    = "integrations/${aws_apigatewayv2_integration.this.id}"
 }
+
 resource "aws_lambda_permission" "apigw" {
   action        = "lambda:InvokeFunction"
   function_name = aws_lambda_function.this.function_name
