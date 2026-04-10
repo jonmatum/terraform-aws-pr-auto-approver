@@ -64,6 +64,24 @@ variable "bedrock_model_id" {
   }
 }
 
+variable "monitoring_enabled" {
+  type        = bool
+  default     = false
+  description = "Enable CloudWatch dashboard and alarms"
+}
+
+variable "alert_email" {
+  type        = string
+  default     = ""
+  description = "Email address for alarm notifications (required if monitoring_enabled = true)"
+}
+
+variable "bedrock_monthly_budget" {
+  type        = number
+  default     = 50
+  description = "Monthly Bedrock spend threshold in USD before alerting"
+}
+
 variable "tags" {
   type        = map(string)
   default     = {}

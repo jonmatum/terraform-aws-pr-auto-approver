@@ -18,3 +18,11 @@ output "api_gateway_endpoint" {
   description = "API Gateway endpoint URL"
   value       = aws_apigatewayv2_api.this.api_endpoint
 }
+output "sns_topic_arn" {
+  description = "SNS topic ARN for alarm notifications"
+  value       = var.monitoring_enabled ? aws_sns_topic.alerts[0].arn : null
+}
+output "dashboard_url" {
+  description = "CloudWatch dashboard URL"
+  value       = var.monitoring_enabled ? "https://console.aws.amazon.com/cloudwatch/home#dashboards:name=${var.name}" : null
+}
