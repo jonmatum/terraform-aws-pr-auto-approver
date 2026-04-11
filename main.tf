@@ -52,7 +52,7 @@ data "aws_iam_policy_document" "lambda" {
     for_each = var.bedrock_enabled ? [1] : []
     content {
       actions   = ["bedrock:InvokeModel"]
-      resources = ["arn:aws:bedrock:*::foundation-model/${var.bedrock_model_id}"]
+      resources = ["arn:aws:bedrock:*:*:inference-profile/${var.bedrock_model_id}", "arn:aws:bedrock:*::foundation-model/*"]
     }
   }
 }

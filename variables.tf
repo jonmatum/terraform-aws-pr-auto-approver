@@ -55,7 +55,7 @@ variable "bedrock_enabled" {
 
 variable "bedrock_model_id" {
   type        = string
-  default     = "anthropic.claude-3-haiku-20240307-v1:0"
+  default     = "us.anthropic.claude-3-5-haiku-20241022-v1:0"
   description = "Bedrock model ID for AI review"
 
   validation {
