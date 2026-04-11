@@ -26,3 +26,7 @@ output "dashboard_url" {
   description = "CloudWatch dashboard URL"
   value       = var.monitoring_enabled ? "https://console.aws.amazon.com/cloudwatch/home#dashboards:name=${var.name}" : null
 }
+output "dlq_arn" {
+  description = "Dead letter queue ARN for failed webhook processing"
+  value       = aws_sqs_queue.dlq.arn
+}

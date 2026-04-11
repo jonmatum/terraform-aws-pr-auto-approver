@@ -53,6 +53,11 @@ data "aws_iam_policy_document" "lambda" {
   }
 
   statement {
+    actions   = ["sqs:SendMessage"]
+    resources = [aws_sqs_queue.dlq.arn]
+  }
+
+  statement {
     actions = ["secretsmanager:GetSecretValue"]
     resources = concat(
       [
@@ -78,6 +83,12 @@ resource "aws_iam_role_policy" "lambda" {
   policy = data.aws_iam_policy_document.lambda.json
 }
 
+resource "aws_sqs_queue" "dlq" {
+  name                      = "${var.name}-dlq"
+  message_retention_seconds = 1209600
+  tags                      = var.tags
+}
+
 resource "aws_lambda_function" "this" {
   function_name    = var.name
   handler          = "lambda.handler"
@@ -87,6 +98,10 @@ resource "aws_lambda_function" "this" {
   filename         = var.lambda_zip_path
   source_code_hash = filebase64sha256(var.lambda_zip_path)
   role             = aws_iam_role.lambda.arn
+
+  dead_letter_config {
+    target_arn = aws_sqs_queue.dlq.arn
+  }
   environment {
     variables = merge(
       {

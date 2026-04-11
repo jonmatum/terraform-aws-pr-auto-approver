@@ -89,6 +89,24 @@ resource "aws_cloudwatch_metric_alarm" "apigw_5xx" {
 
 # --- Budget (Bedrock) ---
 
+resource "aws_cloudwatch_metric_alarm" "dlq_messages" {
+  count               = var.monitoring_enabled ? 1 : 0
+  alarm_name          = "${var.name}-dlq-messages"
+  comparison_operator = "GreaterThanThreshold"
+  evaluation_periods  = 1
+  metric_name         = "ApproximateNumberOfMessagesVisible"
+  namespace           = "AWS/SQS"
+  period              = 300
+  statistic           = "Sum"
+  threshold           = 0
+  alarm_description   = "Failed webhook processing detected in DLQ"
+  alarm_actions       = [aws_sns_topic.alerts[0].arn]
+  dimensions = {
+    QueueName = aws_sqs_queue.dlq.name
+  }
+  tags = var.tags
+}
+
 resource "aws_budgets_budget" "bedrock" {
   count        = var.monitoring_enabled && var.bedrock_enabled ? 1 : 0
   name         = "${var.name}-bedrock-budget"
