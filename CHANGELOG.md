@@ -1,5 +1,12 @@
 # Changelog
 
+## [1.6.0](https://github.com/jonmatum/terraform-aws-pr-auto-approver/compare/v1.5.0...v1.6.0) (2026-04-11)
+
+
+### Features
+
+* add auto_collaborator variable ([#5](https://github.com/jonmatum/terraform-aws-pr-auto-approver/issues/5)) ([2568ee9](https://github.com/jonmatum/terraform-aws-pr-auto-approver/commit/2568ee93836984167bf3361249c1411d425e7f92))
+
 ## [1.3.0] - 2026-04-11
 
 ### Added

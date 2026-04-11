@@ -58,7 +58,7 @@ flowchart LR
 ```hcl
 module "approver" {
   source  = "jonmatum/pr-auto-approver/aws"
-  version = "~> 1.4"
+  version = "~> 1.6"
 
   github_app_id          = "123456"
   github_app_private_key = file("private-key.pem")
