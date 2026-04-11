@@ -142,7 +142,7 @@ resource "aws_cloudwatch_dashboard" "this" {
           ]
           period = 300
           stat   = "Sum"
-          region = data.aws_region.current.name
+          region = data.aws_region.current.id
         }
       },
       {
@@ -158,7 +158,7 @@ resource "aws_cloudwatch_dashboard" "this" {
             ["...", { stat = "p99" }],
           ]
           period = 300
-          region = data.aws_region.current.name
+          region = data.aws_region.current.id
         }
       },
       {
@@ -176,7 +176,7 @@ resource "aws_cloudwatch_dashboard" "this" {
           ]
           period = 300
           stat   = "Sum"
-          region = data.aws_region.current.name
+          region = data.aws_region.current.id
         }
       },
       {
@@ -192,7 +192,7 @@ resource "aws_cloudwatch_dashboard" "this" {
           ]
           period = 300
           stat   = "Maximum"
-          region = data.aws_region.current.name
+          region = data.aws_region.current.id
         }
       },
       ],
@@ -211,7 +211,7 @@ resource "aws_cloudwatch_dashboard" "this" {
             ]
             period = 300
             stat   = "Sum"
-            region = data.aws_region.current.name
+            region = data.aws_region.current.id
           }
         },
     ] : [])

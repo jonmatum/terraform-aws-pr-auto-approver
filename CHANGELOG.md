@@ -1,5 +1,10 @@
 # Changelog
 
+## [1.2.1] - 2026-04-10
+
+### Fixed
+- Replaced deprecated `data.aws_region.current.name` with `.id` in CloudWatch dashboard
+
 ## [1.2.0] - 2026-04-10
 
 ### Changed
