@@ -1,6 +1,7 @@
 resource "aws_secretsmanager_secret" "private_key" {
-  name = "${var.name}-private-key"
-  tags = var.tags
+  name       = "${var.name}-private-key"
+  kms_key_id = var.kms_key_id
+  tags       = var.tags
 }
 
 resource "aws_secretsmanager_secret_version" "private_key" {
@@ -9,8 +10,9 @@ resource "aws_secretsmanager_secret_version" "private_key" {
 }
 
 resource "aws_secretsmanager_secret" "webhook_secret" {
-  name = "${var.name}-webhook-secret"
-  tags = var.tags
+  name       = "${var.name}-webhook-secret"
+  kms_key_id = var.kms_key_id
+  tags       = var.tags
 }
 
 resource "aws_secretsmanager_secret_version" "webhook_secret" {
@@ -19,9 +21,10 @@ resource "aws_secretsmanager_secret_version" "webhook_secret" {
 }
 
 resource "aws_secretsmanager_secret" "approval_token" {
-  count = var.approval_token != "" ? 1 : 0
-  name  = "${var.name}-approval-token"
-  tags  = var.tags
+  count      = var.approval_token != "" ? 1 : 0
+  name       = "${var.name}-approval-token"
+  kms_key_id = var.kms_key_id
+  tags       = var.tags
 }
 
 resource "aws_secretsmanager_secret_version" "approval_token" {
@@ -49,7 +52,7 @@ resource "aws_iam_role" "lambda" {
 data "aws_iam_policy_document" "lambda" {
   statement {
     actions   = ["logs:CreateLogGroup", "logs:CreateLogStream", "logs:PutLogEvents"]
-    resources = ["arn:aws:logs:*:*:*"]
+    resources = [aws_cloudwatch_log_group.lambda.arn, "${aws_cloudwatch_log_group.lambda.arn}:*"] #tfsec:ignore:aws-iam-no-policy-wildcards -- :* suffix required for log streams
   }
 
   statement {
@@ -66,6 +69,11 @@ data "aws_iam_policy_document" "lambda" {
       ],
       var.approval_token != "" ? [aws_secretsmanager_secret.approval_token[0].arn] : []
     )
+  }
+
+  statement {
+    actions   = ["xray:PutTraceSegments", "xray:PutTelemetryRecords"]
+    resources = ["*"]
   }
 
   dynamic "statement" {
@@ -86,6 +94,7 @@ resource "aws_iam_role_policy" "lambda" {
 resource "aws_sqs_queue" "dlq" {
   name                      = "${var.name}-dlq"
   message_retention_seconds = 1209600
+  sqs_managed_sse_enabled   = true
   tags                      = var.tags
 }
 
@@ -99,9 +108,14 @@ resource "aws_lambda_function" "this" {
   source_code_hash = filebase64sha256(var.lambda_zip_path)
   role             = aws_iam_role.lambda.arn
 
+  tracing_config {
+    mode = "Active"
+  }
+
   dead_letter_config {
     target_arn = aws_sqs_queue.dlq.arn
   }
+
   environment {
     variables = merge(
       {
@@ -124,8 +138,16 @@ resource "aws_lambda_function" "this" {
 }
 
 resource "aws_cloudwatch_log_group" "lambda" {
-  name              = "/aws/lambda/${aws_lambda_function.this.function_name}"
+  name              = "/aws/lambda/${var.name}"
   retention_in_days = 14
+  kms_key_id        = var.kms_key_id
+  tags              = var.tags
+}
+
+resource "aws_cloudwatch_log_group" "apigw" {
+  name              = "/aws/apigateway/${var.name}"
+  retention_in_days = 14
+  kms_key_id        = var.kms_key_id
   tags              = var.tags
 }
 
@@ -140,6 +162,19 @@ resource "aws_apigatewayv2_stage" "this" {
   name        = "$default"
   auto_deploy = true
   tags        = var.tags
+
+  access_log_settings {
+    destination_arn = aws_cloudwatch_log_group.apigw.arn
+    format = jsonencode({
+      requestId      = "$context.requestId"
+      ip             = "$context.identity.sourceIp"
+      requestTime    = "$context.requestTime"
+      httpMethod     = "$context.httpMethod"
+      routeKey       = "$context.routeKey"
+      status         = "$context.status"
+      responseLength = "$context.responseLength"
+    })
+  }
 
   default_route_settings {
     throttling_burst_limit = 10
