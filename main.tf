@@ -83,6 +83,9 @@ resource "aws_lambda_function" "this" {
       var.bedrock_enabled ? {
         BEDROCK_ENABLED  = "true"
         BEDROCK_MODEL_ID = var.bedrock_model_id
+      } : {},
+      var.auto_merge ? {
+        AUTO_MERGE = "true"
       } : {}
     )
   }

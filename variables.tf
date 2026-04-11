@@ -82,6 +82,12 @@ variable "bedrock_monthly_budget" {
   description = "Monthly Bedrock spend threshold in USD before alerting"
 }
 
+variable "auto_merge" {
+  type        = bool
+  default     = false
+  description = "Auto-merge PRs after approval (requires App bypass on branch ruleset)"
+}
+
 variable "tags" {
   type        = map(string)
   default     = {}
