@@ -1,25 +1,64 @@
 # terraform-aws-pr-auto-approver
 
-Terraform module that deploys a GitHub App PR auto-approver to AWS Lambda behind API Gateway, with optional AI code review via Amazon Bedrock.
+Terraform module that deploys a GitHub App PR auto-approver to AWS with AI code review via Amazon Bedrock.
 
 ## Architecture
 
+```mermaid
+flowchart TB
+    GH[GitHub App Webhook] --> AG[API Gateway HTTP]
+    AG --> LM[Lambda]
+    LM --> SM[Secrets Manager]
+    LM --> BR[Bedrock Claude]
+    LM --> GHA[GitHub API]
+    LM --> CW[CloudWatch Logs]
+    LM --> DLQ[SQS Dead Letter Queue]
+    
+    subgraph Monitoring
+        CW --> AL[CloudWatch Alarms]
+        AL --> SNS[SNS Email Alerts]
+        BU[AWS Budget] --> SNS
+    end
 ```
-GitHub App webhook → API Gateway (HTTP) → Lambda (Probot) → Secrets Manager
-                                                ↓
-                                          [Bedrock AI Review]
-                                                ↓
-                                          GitHub API (approve / request changes)
+
+## Resources Created
+
+```mermaid
+flowchart LR
+    subgraph Compute
+        LM[Lambda Function]
+        AG[API Gateway v2]
+    end
+    subgraph Security
+        SM1[Secret: Private Key]
+        SM2[Secret: Webhook Secret]
+        SM3[Secret: Approval Token]
+        IAM[IAM Role + Policy]
+    end
+    subgraph Monitoring
+        CW[CloudWatch Logs]
+        DB[Dashboard]
+        A1[Alarm: Errors]
+        A2[Alarm: Throttles]
+        A3[Alarm: Duration]
+        A4[Alarm: 5xx]
+        A5[Alarm: DLQ]
+        SNS[SNS Topic]
+        BU[Bedrock Budget]
+    end
+    subgraph Reliability
+        DLQ[SQS DLQ]
+    end
 ```
 
 ## Usage
 
-### Basic (auto-approve after CI passes)
+### Basic
 
 ```hcl
 module "approver" {
   source  = "jonmatum/pr-auto-approver/aws"
-  version = "~> 1.3"
+  version = "~> 1.4"
 
   github_app_id          = "123456"
   github_app_private_key = file("private-key.pem")
@@ -29,12 +68,12 @@ module "approver" {
 }
 ```
 
-### With Bedrock AI Review + PAT Approval
+### Full (Bedrock + PAT + Monitoring)
 
 ```hcl
 module "approver" {
   source  = "jonmatum/pr-auto-approver/aws"
-  version = "~> 1.3"
+  version = "~> 1.4"
 
   github_app_id          = "123456"
   github_app_private_key = file("private-key.pem")
@@ -54,47 +93,46 @@ module "approver" {
 | Mode | How | Branch Protection |
 |------|-----|-------------------|
 | **App token** (default) | Bot approves as GitHub App | ❌ Doesn't count on Free plan |
-| **PAT token** (recommended) | Bot approves as a real user | ✅ Counts toward required reviews |
-
-To use PAT mode, create a classic GitHub PAT with `repo` scope from a second account, add that account as a collaborator with write access, and pass the token via `approval_token`.
+| **PAT token** (recommended) | Bot approves as real user | ✅ Counts toward required reviews |
 
 ## Security
 
-- All secrets stored in AWS Secrets Manager (private key, webhook secret, approval token)
-- Lambda env vars contain only Secrets Manager ARNs, never raw values
+- All secrets in AWS Secrets Manager — never in Lambda env vars
 - IAM scoped to specific secrets only
 - API Gateway throttling (burst: 10, rate: 5 req/s)
-- Webhook signature verified by Probot on every request
+- Webhook signature verified on every request
+- SQS DLQ for failed webhook processing
 
 ## Inputs
 
 | Name | Description | Type | Default | Required |
 |------|-------------|------|---------|----------|
-| name | Name prefix for all resources | `string` | `"pr-auto-approver"` | no |
-| github_app_id | GitHub App ID | `string` | n/a | yes |
-| github_app_private_key | GitHub App private key (PEM) | `string` | n/a | yes |
-| github_webhook_secret | Webhook secret | `string` | n/a | yes |
+| name | Resource name prefix | `string` | `"pr-auto-approver"` | no |
+| github_app_id | GitHub App ID | `string` | | yes |
+| github_app_private_key | Private key (PEM) | `string` | | yes |
+| github_webhook_secret | Webhook secret | `string` | | yes |
 | allowed_authors | Comma-separated usernames | `string` | `""` | no |
-| lambda_zip_path | Path to Lambda zip | `string` | n/a | yes |
+| lambda_zip_path | Path to Lambda zip | `string` | | yes |
 | approval_token | GitHub PAT for approvals | `string` | `""` | no |
-| bedrock_enabled | Enable AI code review | `bool` | `false` | no |
-| bedrock_model_id | Bedrock model ID | `string` | `"us.anthropic.claude-3-5-haiku-20241022-v1:0"` | no |
-| monitoring_enabled | Enable CloudWatch dashboard/alarms | `bool` | `false` | no |
-| alert_email | Email for alarm notifications | `string` | `""` | no |
-| bedrock_monthly_budget | Monthly Bedrock spend threshold (USD) | `number` | `50` | no |
-| tags | Tags for all resources | `map(string)` | `{}` | no |
+| bedrock_enabled | Enable AI review | `bool` | `false` | no |
+| bedrock_model_id | Bedrock model | `string` | Claude 3.5 Haiku | no |
+| monitoring_enabled | Enable dashboard/alarms | `bool` | `false` | no |
+| alert_email | Email for alerts | `string` | `""` | no |
+| bedrock_monthly_budget | Monthly budget (USD) | `number` | `50` | no |
+| tags | Resource tags | `map(string)` | `{}` | no |
 
 ## Outputs
 
 | Name | Description |
 |------|-------------|
-| webhook_url | Set this as your GitHub App webhook URL |
+| webhook_url | GitHub App webhook URL |
 | lambda_function_name | Lambda function name |
 | lambda_function_arn | Lambda function ARN |
 | api_gateway_id | API Gateway ID |
 | api_gateway_endpoint | API Gateway base URL |
-| sns_topic_arn | SNS topic ARN (when monitoring enabled) |
-| dashboard_url | CloudWatch dashboard URL (when monitoring enabled) |
+| sns_topic_arn | SNS topic ARN |
+| dashboard_url | CloudWatch dashboard URL |
+| dlq_arn | Dead letter queue ARN |
 
 ## License
 
