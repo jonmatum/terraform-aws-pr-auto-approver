@@ -82,6 +82,13 @@ variable "bedrock_monthly_budget" {
   description = "Monthly Bedrock spend threshold in USD before alerting"
 }
 
+variable "approval_token" {
+  type        = string
+  default     = ""
+  sensitive   = true
+  description = "GitHub PAT for approvals (counts toward branch protection). If empty, uses App token."
+}
+
 variable "auto_merge" {
   type        = bool
   default     = false

@@ -18,6 +18,18 @@ resource "aws_secretsmanager_secret_version" "webhook_secret" {
   secret_string = var.github_webhook_secret
 }
 
+resource "aws_secretsmanager_secret" "approval_token" {
+  count = var.approval_token != "" ? 1 : 0
+  name  = "${var.name}-approval-token"
+  tags  = var.tags
+}
+
+resource "aws_secretsmanager_secret_version" "approval_token" {
+  count         = var.approval_token != "" ? 1 : 0
+  secret_id     = aws_secretsmanager_secret.approval_token[0].id
+  secret_string = var.approval_token
+}
+
 data "aws_iam_policy_document" "lambda_assume" {
   statement {
     actions = ["sts:AssumeRole"]
@@ -42,10 +54,13 @@ data "aws_iam_policy_document" "lambda" {
 
   statement {
     actions = ["secretsmanager:GetSecretValue"]
-    resources = [
-      aws_secretsmanager_secret.private_key.arn,
-      aws_secretsmanager_secret.webhook_secret.arn,
-    ]
+    resources = concat(
+      [
+        aws_secretsmanager_secret.private_key.arn,
+        aws_secretsmanager_secret.webhook_secret.arn,
+      ],
+      var.approval_token != "" ? [aws_secretsmanager_secret.approval_token[0].arn] : []
+    )
   }
 
   dynamic "statement" {
@@ -83,6 +98,9 @@ resource "aws_lambda_function" "this" {
       var.bedrock_enabled ? {
         BEDROCK_ENABLED  = "true"
         BEDROCK_MODEL_ID = var.bedrock_model_id
+      } : {},
+      var.approval_token != "" ? {
+        APPROVAL_TOKEN_SECRET_ARN = aws_secretsmanager_secret.approval_token[0].arn
       } : {},
       var.auto_merge ? {
         AUTO_MERGE = "true"
