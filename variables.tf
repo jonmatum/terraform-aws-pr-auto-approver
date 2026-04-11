@@ -89,6 +89,12 @@ variable "approval_token" {
   description = "GitHub PAT for approvals (counts toward branch protection). If empty, uses App token."
 }
 
+variable "kms_key_id" {
+  type        = string
+  default     = null
+  description = "KMS key ID for encrypting secrets, logs, and queues. If null, uses AWS managed keys."
+}
+
 variable "tags" {
   type        = map(string)
   default     = {}
