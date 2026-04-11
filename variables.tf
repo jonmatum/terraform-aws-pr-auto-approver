@@ -89,6 +89,12 @@ variable "approval_token" {
   description = "GitHub PAT for approvals (counts toward branch protection). If empty, uses App token."
 }
 
+variable "auto_collaborator" {
+  type        = string
+  default     = ""
+  description = "GitHub username to auto-invite as collaborator on new repos. If empty, disabled."
+}
+
 variable "kms_key_id" {
   type        = string
   default     = null
