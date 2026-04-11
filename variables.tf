@@ -89,12 +89,6 @@ variable "approval_token" {
   description = "GitHub PAT for approvals (counts toward branch protection). If empty, uses App token."
 }
 
-variable "auto_merge" {
-  type        = bool
-  default     = false
-  description = "Auto-merge PRs after approval (requires App bypass on branch ruleset)"
-}
-
 variable "tags" {
   type        = map(string)
   default     = {}

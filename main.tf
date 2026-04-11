@@ -101,9 +101,6 @@ resource "aws_lambda_function" "this" {
       } : {},
       var.approval_token != "" ? {
         APPROVAL_TOKEN_SECRET_ARN = aws_secretsmanager_secret.approval_token[0].arn
-      } : {},
-      var.auto_merge ? {
-        AUTO_MERGE = "true"
       } : {}
     )
   }

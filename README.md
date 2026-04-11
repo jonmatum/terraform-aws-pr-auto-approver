@@ -1,6 +1,6 @@
 # terraform-aws-pr-auto-approver
 
-Terraform module that deploys a GitHub App PR auto-approver to AWS Lambda behind API Gateway, with optional AI code review via Amazon Bedrock and CloudWatch monitoring.
+Terraform module that deploys a GitHub App PR auto-approver to AWS Lambda behind API Gateway, with optional AI code review via Amazon Bedrock.
 
 ## Architecture
 
@@ -12,27 +12,14 @@ GitHub App webhook → API Gateway (HTTP) → Lambda (Probot) → Secrets Manage
                                           GitHub API (approve / request changes)
 ```
 
-## Resources Created
-
-| Resource | Purpose |
-|----------|---------|
-| AWS Lambda | Runs the Probot app |
-| API Gateway v2 (HTTP) | Receives GitHub webhooks |
-| Secrets Manager (2 secrets) | Stores private key + webhook secret |
-| IAM Role + Policy | Least-privilege (logs, secrets, optionally Bedrock) |
-| CloudWatch Log Group | Lambda logs, 14-day retention |
-| CloudWatch Dashboard | Metrics visualization (optional) |
-| CloudWatch Alarms (4) | Error/throttle/duration/5xx alerts (optional) |
-| SNS Topic + Email | Alarm notifications (optional) |
-| AWS Budget | Bedrock spend alerts (optional) |
-
 ## Usage
 
 ### Basic (auto-approve after CI passes)
 
 ```hcl
 module "approver" {
-  source = "github.com/jonmatum/terraform-aws-pr-auto-approver?ref=v1.2.0"
+  source  = "jonmatum/pr-auto-approver/aws"
+  version = "~> 1.3"
 
   github_app_id          = "123456"
   github_app_private_key = file("private-key.pem")
@@ -42,11 +29,12 @@ module "approver" {
 }
 ```
 
-### With Bedrock AI Review + Monitoring
+### With Bedrock AI Review + PAT Approval
 
 ```hcl
 module "approver" {
-  source = "github.com/jonmatum/terraform-aws-pr-auto-approver?ref=v1.2.0"
+  source  = "jonmatum/pr-auto-approver/aws"
+  version = "~> 1.3"
 
   github_app_id          = "123456"
   github_app_private_key = file("private-key.pem")
@@ -54,48 +42,29 @@ module "approver" {
   allowed_authors        = "your-username"
   lambda_zip_path        = "./lambda.zip"
 
-  bedrock_enabled        = true
-  monitoring_enabled     = true
-  alert_email            = "you@example.com"
-  bedrock_monthly_budget = 50
+  bedrock_enabled    = true
+  approval_token     = var.approval_token
+  monitoring_enabled = true
+  alert_email        = "you@example.com"
 }
 ```
 
-### Bedrock AI Review
+## Approval Modes
 
-When `bedrock_enabled = true`:
-- Lambda timeout increases to 120s, memory to 256MB
-- IAM role gets `bedrock:InvokeModel` scoped to the specified model
-- The bot reviews PR diffs for bugs, security vulnerabilities, and missing error handling
-- Clean code → auto-approved ✅
-- Issues found → inline review comments + changes requested ❌
+| Mode | How | Branch Protection |
+|------|-----|-------------------|
+| **App token** (default) | Bot approves as GitHub App | ❌ Doesn't count on Free plan |
+| **PAT token** (recommended) | Bot approves as a real user | ✅ Counts toward required reviews |
 
-### Monitoring
-
-When `monitoring_enabled = true`:
-- CloudWatch Dashboard with Lambda, API Gateway, and Bedrock metrics
-- Alarms: Lambda errors (>5/5min), throttles (>3/5min), high duration, API Gateway 5xx
-- SNS email alerts
-- Bedrock monthly budget alerts at 80% and 100%
+To use PAT mode, create a classic GitHub PAT with `repo` scope from a second account, add that account as a collaborator with write access, and pass the token via `approval_token`.
 
 ## Security
 
-- **Secrets are never stored in Lambda environment variables.** The Lambda reads `PRIVATE_KEY` and `WEBHOOK_SECRET` from Secrets Manager at runtime on cold start, then caches them in memory.
-- Lambda env vars contain only Secrets Manager ARNs.
-- IAM policy is scoped to only the two specific secrets.
-- API Gateway has throttling (burst: 10, rate: 5 req/s).
-- Webhook signature is verified by Probot on every request.
-
-## Prerequisites
-
-1. Create a GitHub App with Pull requests (Read & Write) and Checks (Read) permissions, subscribed to Pull request and Check suite events
-2. Build Lambda zip from [pr-auto-approver](https://github.com/jonmatum/pr-auto-approver):
-   ```bash
-   npm ci && zip -r lambda.zip index.js lambda.js review.js secrets.js node_modules package.json
-   ```
-3. (Optional) Enable the Bedrock model in your AWS account via the Bedrock console
-
-> **Important:** Use the GitHub App's built-in webhook to deliver events. Do NOT create separate repo-level webhooks — they lack the `installation` key that Probot requires for authentication.
+- All secrets stored in AWS Secrets Manager (private key, webhook secret, approval token)
+- Lambda env vars contain only Secrets Manager ARNs, never raw values
+- IAM scoped to specific secrets only
+- API Gateway throttling (burst: 10, rate: 5 req/s)
+- Webhook signature verified by Probot on every request
 
 ## Inputs
 
@@ -105,11 +74,12 @@ When `monitoring_enabled = true`:
 | github_app_id | GitHub App ID | `string` | n/a | yes |
 | github_app_private_key | GitHub App private key (PEM) | `string` | n/a | yes |
 | github_webhook_secret | Webhook secret | `string` | n/a | yes |
-| allowed_authors | Comma-separated usernames to auto-approve | `string` | `""` | no |
-| lambda_zip_path | Path to Lambda deployment zip | `string` | n/a | yes |
-| bedrock_enabled | Enable AI code review via Bedrock | `bool` | `false` | no |
-| bedrock_model_id | Bedrock model ID | `string` | `"anthropic.claude-3-haiku-20240307-v1:0"` | no |
-| monitoring_enabled | Enable CloudWatch dashboard and alarms | `bool` | `false` | no |
+| allowed_authors | Comma-separated usernames | `string` | `""` | no |
+| lambda_zip_path | Path to Lambda zip | `string` | n/a | yes |
+| approval_token | GitHub PAT for approvals | `string` | `""` | no |
+| bedrock_enabled | Enable AI code review | `bool` | `false` | no |
+| bedrock_model_id | Bedrock model ID | `string` | `"us.anthropic.claude-3-5-haiku-20241022-v1:0"` | no |
+| monitoring_enabled | Enable CloudWatch dashboard/alarms | `bool` | `false` | no |
 | alert_email | Email for alarm notifications | `string` | `""` | no |
 | bedrock_monthly_budget | Monthly Bedrock spend threshold (USD) | `number` | `50` | no |
 | tags | Tags for all resources | `map(string)` | `{}` | no |
@@ -125,11 +95,6 @@ When `monitoring_enabled = true`:
 | api_gateway_endpoint | API Gateway base URL |
 | sns_topic_arn | SNS topic ARN (when monitoring enabled) |
 | dashboard_url | CloudWatch dashboard URL (when monitoring enabled) |
-
-## Related
-
-- [pr-auto-approver](https://github.com/jonmatum/pr-auto-approver) — Lambda app code
-- [terraform-github-pr-auto-approver](https://github.com/jonmatum/terraform-github-pr-auto-approver) — GitHub webhooks module (optional)
 
 ## License
 

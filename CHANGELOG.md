@@ -1,5 +1,16 @@
 # Changelog
 
+## [1.3.0] - 2026-04-11
+
+### Added
+- Optional `approval_token` for PAT-based approvals that satisfy branch protection on GitHub Free plan
+- Approval token stored in Secrets Manager
+- Claude 3.5 Haiku as default Bedrock model
+- IAM support for Bedrock inference profiles
+
+### Removed
+- `auto_merge` variable (approve only, user clicks merge)
+
 ## [1.2.1] - 2026-04-10
 
 ### Fixed
